@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+        <Company>$(Authors)</Company>
+        <Authors>stagecodes</Authors>
+        <Description>Simple memory reader and writer for 32 and 64-bit processes</Description>
+        <Copyright>Copyright (c) StageCodes 2022. Licensed under the GNU General Public License v3.</Copyright>
+        <PackageProjectUrl></PackageProjectUrl>
+        <PackageIcon>chip128.png</PackageIcon>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <RepositoryUrl>https://github.com/hburn7/SimpleMem</RepositoryUrl>
+        <AssemblyVersion>1.0.0</AssemblyVersion>
+        <PackageTags>memory,mem,memory read,memory write,read,write,hex,hexadecimal,pointer,pointer scan,pointerscan,offset,offsets,hack,hacking</PackageTags>
+        <RepositoryType>git</RepositoryType>
+        <PackageLicenseFile>LICENSE.txt</PackageLicenseFile>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+        <DocumentationFile>bin\Debug\SimpleMem.xml</DocumentationFile>
+    </PropertyGroup>
+
+    <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+        <DocumentationFile>bin\Release\SimpleMem.xml</DocumentationFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\..\..\artwork\simple-mem\chip128.png">
+            <Pack>True</Pack>
+            <PackagePath>\</PackagePath>
+        </None>
+        <None Include="..\README.md">
+            <Pack>True</Pack>
+            <PackagePath>\</PackagePath>
+        </None>
+        <None Include="..\LICENSE.txt">
+            <Pack>True</Pack>
+            <PackagePath>\</PackagePath>
+        </None>
+    </ItemGroup>
+
+</Project>
