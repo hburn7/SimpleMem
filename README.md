@@ -1,6 +1,7 @@
 # SimpleMem
+<img src="logo.png"></img>
 
-The best general-purpose memory reader/writer for C#
+The best general-purpose memory reader/writer for C# 
 
 ## Prerequisites
 
