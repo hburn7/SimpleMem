@@ -21,7 +21,11 @@ application is what we will refer to as the process name.
 using SimpleMem;
 
 // Prints all process names on your system.
-Memory.ListProcesses();
+List<string> names = Memory.GetProcessList();
+foreach(var n in names)
+{
+    Console.WriteLine(n);
+}
 ```
 
 Find the name of the base module, if not known. This is typically the name of the process name and its extension, such as `MyApplication.exe`. This can also be a `.dll`.
