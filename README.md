@@ -3,12 +3,14 @@
 
 The best general-purpose memory reader/writer for C# 
 
+<img src="https://img.shields.io/nuget/v/SimpleMem"> <img src="https://img.shields.io/github/license/hburn7/SimpleMem">
+
 ## Prerequisites
 
 - ⚠️ SimpleMem only runs on Windows.
 - ⚠️ Support for manipulating memory in 64-bit processes will be coming in a later update.
-- Download the [NuGet package](https://www.nuget.org/packages/SimpleMem/1.0.0)
-- Download the [.NET 6 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/6.0) (if needed)
+- Install the [NuGet package](https://www.nuget.org/packages/SimpleMem/1.0.0)
+- Install the [.NET 6 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/6.0) (if needed)
 
 ## Getting Started
 
