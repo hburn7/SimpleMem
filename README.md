@@ -9,7 +9,7 @@ The best general-purpose memory reader/writer for C#
 
 - ⚠️ SimpleMem only runs on Windows.
 - ⚠️ Support for manipulating memory in 64-bit processes will be coming in a later update.
-- Install the [NuGet package](https://www.nuget.org/packages/SimpleMem/1.0.0)
+- Install the [NuGet package](https://www.nuget.org/packages/SimpleMem/)
 - Install the [.NET 6 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/6.0) (if needed)
 
 ## Getting Started
@@ -43,7 +43,7 @@ Open the application, in this case `MyGame.exe`.
 Create a new `Memory32` or `Memory64` (coming soon) object, depending on the architecture of the application. Say the address in question is `0x1234` and is an `Int32`. To read this value, we simply call `.ReadMemoryInt32()` on it.
 
 ```cs
-const Int32 ADDRESS = 0x1234; // Address to write to
+const Int32 ADDRESS = 0x1234; // Address to read from
 
 var mem = new Memory32("MyGame"); // Your process name here
 int readValue = mem.ReadMemoryInt32(ADDRESS);
