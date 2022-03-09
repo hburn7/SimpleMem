@@ -3,6 +3,34 @@ using System.Runtime.InteropServices;
 
 namespace SimpleMem;
 
+public struct MEMORY_BASIC_INFORMATION
+{
+	public ulong BaseAddress;
+	public ulong AllocationBase;
+	public uint AllocationProtect;
+	public uint __alignment1;
+	public ulong RegionSize;
+	public uint State;
+	public uint Protect;
+	public uint Type;
+	public uint __alignment2;
+}
+
+public struct SYSTEM_INFO
+{
+	public ushort processorArchitecture;
+	ushort reserved;
+	public uint pageSize;
+	public IntPtr minimumApplicationAddress;
+	public IntPtr maximumApplicationAddress;
+	public IntPtr activeProcessorMask;
+	public uint numberOfProcessors;
+	public uint processorType;
+	public uint allocationGranularity;
+	public ushort processorLevel;
+	public ushort processorRevision;
+}    
+
 /// <summary>
 /// Access level to open a process with
 /// </summary>
@@ -22,9 +50,13 @@ public enum AccessLevel
 	/// </summary>
 	OPERATION = 0x0008,
 	/// <summary>
+	/// Required to retrieve certain information about a process, such as its token, exit code, and priority class
+	/// </summary>
+	QUERY_INFORMATION = 0x0400,
+	/// <summary>
 	/// All possible access rights for a process (that are necessary to read/write memory)
 	/// </summary>
-	ALL_ACCESS = READ | WRITE | OPERATION
+	ALL_ACCESS = READ | WRITE | OPERATION | QUERY_INFORMATION
 }
 
 /// <summary>
@@ -32,6 +64,11 @@ public enum AccessLevel
 /// </summary>
 public class Memory
 {
+	private const int PROCESS_QUERY_INFORMATION = 0x0400;
+	private const int PROCESS_WM_READ = 0x0010;
+	protected const int MEM_COMMIT = 0x00001000;
+	protected const int PAGE_READWRITE = 0x04;
+	
 	/// <summary>
 	///  Opens a handle to the given processName at the provided moduleName.
 	///  For example, if I have a process named "FTLGame" and my desired base address
@@ -48,54 +85,53 @@ public class Memory
 	/// AccessLevel.ALL_ACCESS gives full read-write access to the process.</param>
 	protected Memory(string processName, AccessLevel accessLevel = AccessLevel.ALL_ACCESS)
 	{
-		ProcessName = processName;
-
-		var proc = GetProcess();
-		ProcessID = proc.Id;
+		Process = GetProcess(processName);
 		ProcessAccessLevel = accessLevel;
-		ProcessHandle = OpenProcess((int)ProcessAccessLevel, false, ProcessID);
+		ProcessHandle = OpenProcess((int)ProcessAccessLevel, false, Process.Id);
 	}
 
 	/// <summary>
 	///  The user-defined desired access level for which the process was opened under.
 	/// </summary>
-	protected AccessLevel ProcessAccessLevel { get; }
+	public AccessLevel ProcessAccessLevel { get; }
 	/// <summary>
-	///  Process ID of the running executable.
+	/// The current process
 	/// </summary>
-	protected int ProcessID { get; }
+	public Process Process { get; }
 	/// <summary>
-	///  Process name of the running executable.
+	///  Pointer to the handle of the opened process in memory.
 	/// </summary>
-	protected string ProcessName { get; }
-	/// <summary>
-	///  Pointer to the handle of the process in memory.
-	/// </summary>
-	protected IntPtr ProcessHandle { get; }
+	public IntPtr ProcessHandle { get; }
 
 	[DllImport("kernel32.dll")]
 	private static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
+	
+	[DllImport("kernel32.dll")]
+	protected static extern void GetSystemInfo(out SYSTEM_INFO lpSystemInfo);
+	
+	[DllImport("kernel32.dll", SetLastError=true)]
+	protected static extern int VirtualQueryEx(IntPtr hProcess, 
+		IntPtr lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, uint dwLength);
 
 	/// <summary>
 	///  Gets the process (if possible) based on the class's processName.
 	/// </summary>
 	/// <exception cref="IndexOutOfRangeException">Thrown if the process is not found.</exception>
 	/// <returns></returns>
-	protected Process GetProcess()
+	protected Process GetProcess(string processName)
 	{
 		while (true)
 		{
 			try
 			{
-				var proc = Process.GetProcessesByName(ProcessName)[0];
-
-				Console.WriteLine($"Process {ProcessName} found!");
+				var proc = Process.GetProcessesByName(processName)[0];
+				Console.WriteLine($"Process {processName} found!");
 
 				return proc;
 			}
 			catch (IndexOutOfRangeException)
 			{
-				throw new IndexOutOfRangeException($"Process {ProcessName} not found.");
+				throw new IndexOutOfRangeException($"Process {processName} not found.");
 			}
 		}
 	}

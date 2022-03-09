@@ -1,5 +1,7 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace SimpleMem;
 
@@ -25,7 +27,7 @@ public class Memory32 : Memory
 		ProcessHandleInt32 = ProcessHandle.ToInt32();
 	}
 
-	private Int32 ProcessHandleInt32 { get; }
+	protected Int32 ProcessHandleInt32 { get; }
 
 	[DllImport("kernel32.dll")]
 	protected internal static extern bool ReadProcessMemory(Int32 hProcess,
@@ -238,6 +240,7 @@ public class Memory32 : Memory
 	{
 		int bytesRead = 0;
 		byte[] buffer = new byte[sizeBytes];
+		// BUG: the memory needs to be paged and looped through if sizeBytes is too large as RPM has a size limit.
 		ReadProcessMemory(ProcessHandleInt32, lpBaseAddress, buffer, buffer.Length, ref bytesRead);
 		return buffer;
 	}

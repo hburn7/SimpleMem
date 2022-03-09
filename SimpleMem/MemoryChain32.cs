@@ -1,4 +1,6 @@
 ﻿using System.Diagnostics;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace SimpleMem;
 
@@ -8,42 +10,143 @@ namespace SimpleMem;
 /// </summary>
 public class MemoryChain32 : Memory32
 {
+	private readonly string _moduleName;
+	
 	/// <summary>
 	/// </summary>
 	/// <param name="processName">
 	///  The name of the process. Use <see cref="Memory.GetProcessList" />
 	///  and find your process name if unsure. That value can be passed in as this parameter.
 	/// </param>
-	/// <param name="moduleName">The name of the module (with extension .exe, .dll, etc.)</param>
+	/// <param name="moduleName">The name of the module (with extension .exe, .dll, etc.) By
+	/// default, this evaluates to the process's main module name, which is almost always the
+	/// name of the executable.</param>
 	/// <param name="accessLevel">The desired access level.
 	/// The minimum required for reading is AccessLevel.READ and the minimum required
 	/// for writing is AccessLevel.WRITE | AccessLevel.OPERATION.
 	/// AccessLevel.ALL_ACCESS gives full read-write access to the process.</param>
-	public MemoryChain32(string processName, string moduleName, AccessLevel accessLevel = AccessLevel.ALL_ACCESS) : base(processName,
-		accessLevel)
+	public MemoryChain32(string processName, string? moduleName = null, 
+		AccessLevel accessLevel = AccessLevel.ALL_ACCESS) : base(processName, accessLevel)
 	{
-		ModuleName = moduleName;
-		ModuleBaseAddress = GetModuleBaseAddress(GetProcess());
+		_moduleName = moduleName ?? Process.MainModule?.ModuleName ?? "<module not found>";
+
+		if (moduleName == null)
+		{
+			Module = Process.MainModule ?? throw new InvalidOperationException("Process has no main module.");
+		}
+		else
+		{
+			Module = GetModule(Process);
+		}
 	}
-
+	
 	/// <summary>
-	///  Name of the module that serves as the base address.
+	/// Module assosciated with the provided moduleName, or the process's MainModule by default.
 	/// </summary>
-	public string ModuleName { get; }
-	/// <summary>
-	///  Pointer to the memory address of the module, also known as the "module base address".
-	/// </summary>
-	public IntPtr ModuleBaseAddress { get; }
+	public ProcessModule Module { get; }
 
-	private IntPtr GetModuleBaseAddress(Process proc)
+	private ProcessModule GetModule(Process proc)
 	{
 		var module = proc.Modules
 		                 .Cast<ProcessModule>()
-		                 .SingleOrDefault(m => string.Equals(m.ModuleName, ModuleName,
-			                 StringComparison.OrdinalIgnoreCase));
+		                 .SingleOrDefault(module => string.Equals(module.ModuleName, _moduleName, StringComparison.OrdinalIgnoreCase));
 
-		// Attempt to get the base address of the module - Return IntPtr.Zero if the module doesn't exist in the process
-		return module?.BaseAddress ?? IntPtr.Zero;
+		if (module == null)
+		{
+			throw new InvalidOperationException($"Could not retrieve the module {_moduleName}.");
+		}
+		
+		return module;
+	}
+	
+	public List<IntPtr> AoBScan(string pattern)
+	{
+		int bytesRead = 0;
+		
+		// Get min & max addresses
+
+		SYSTEM_INFO sysInfo = new SYSTEM_INFO();
+		GetSystemInfo(out sysInfo);
+
+		IntPtr procMinAddress = sysInfo.minimumApplicationAddress;
+		IntPtr procMaxAddress = sysInfo.maximumApplicationAddress;
+
+		Int64 procMinAddressL = (long)procMinAddress;
+		Int64 procMaxAddressL = (long)procMaxAddress;
+
+		MEMORY_BASIC_INFORMATION memBasicInfo = new MEMORY_BASIC_INFORMATION();
+		
+		Int32[] intBytes = transformBytes(pattern);
+		
+		var ret = new List<IntPtr>();
+		while (procMinAddressL < procMaxAddressL)
+		{
+			// Console.WriteLine($"Scanning...{procMinAddressL:X} - {procMaxAddressL:X}");
+			// 28 = sizeof(MEMORY_BASIC_INFORMATION)
+			VirtualQueryEx(ProcessHandle, procMinAddress, out memBasicInfo, 48);
+			
+			// Check to see if chunk is accessible
+			if (memBasicInfo.Protect == PAGE_READWRITE && memBasicInfo.State == MEM_COMMIT)
+			{
+				byte[] buffer = new byte[memBasicInfo.RegionSize];
+				ReadProcessMemory((Int32)ProcessHandle, (int)memBasicInfo.BaseAddress, buffer, (int)memBasicInfo.RegionSize, ref bytesRead);
+				
+				var results = new List<IntPtr>();
+
+				for (int i = 0; i < buffer.Length; i++)
+				{
+					for (int j = 0; j < intBytes.Length; j++)
+					{
+						if (intBytes[j] != -1 && intBytes[j] != buffer[i + j])
+						{
+							if(j > 2)
+								Console.WriteLine($"Broken chain (len={j})");
+							break;
+						}
+						
+						if ((j + 1) == intBytes.Length)
+						{
+							var result = new IntPtr(i + Module.BaseAddress.ToInt32());
+							results.Add(result);
+						}
+					}
+				}
+				
+				ret.AddRange(results);
+			}
+			
+			procMinAddressL += (long) memBasicInfo.RegionSize;
+			procMinAddress = new IntPtr(procMinAddressL);
+		}
+
+		return ret;
+		
+		// Helper method
+		Int32[] transformBytes(string signature)
+		{
+			string[] bytes = signature.Split(' ');
+			Int32[] ints = new int[bytes.Length];
+
+			var regexes = new Regex[]
+			{
+				new Regex(@"\?[0-9]"),
+				new Regex(@"[0-9]\?")
+			};
+			
+			for (int i = 0; i < ints.Length; i++)
+			{
+				if (bytes[i] == "??" || regexes.Any(x => x.IsMatch(bytes[i])))
+				{
+					ints[i] = -1;
+				}
+				else
+				{
+					ints[i] = Int32.Parse(bytes[i], NumberStyles.HexNumber);
+				}
+			}
+
+			return ints;
+		}
 	}
 
 	/// <summary>
@@ -73,7 +176,7 @@ public class MemoryChain32 : Memory32
 	/// </summary>
 	public Int32 GetAddressFromPointerChain(Int32[] offsets, Int32? lpBaseAddress = null)
 	{
-		lpBaseAddress ??= ModuleBaseAddress.ToInt32();
+		lpBaseAddress ??= Module.BaseAddress.ToInt32();
 
 		if (offsets.Length == 0)
 		{
