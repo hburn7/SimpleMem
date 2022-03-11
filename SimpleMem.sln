@@ -2,8 +2,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleMem", "SimpleMem\SimpleMem.csproj", "{35FB4875-8E54-4CFC-971B-1060D89BFA26}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MemTest", "MemTest\MemTest.csproj", "{AA4551D2-0CCE-4B94-9ECB-0E0EA5B353A7}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -11,13 +9,9 @@ Global
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{35FB4875-8E54-4CFC-971B-1060D89BFA26}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{35FB4875-8E54-4CFC-971B-1060D89BFA26}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{35FB4875-8E54-4CFC-971B-1060D89BFA26}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{35FB4875-8E54-4CFC-971B-1060D89BFA26}.Release|Any CPU.Build.0 = Release|Any CPU
 		{35FB4875-8E54-4CFC-971B-1060D89BFA26}.Release|Any CPU.Deploy.0 = Release|Any CPU
-		{35FB4875-8E54-4CFC-971B-1060D89BFA26}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{AA4551D2-0CCE-4B94-9ECB-0E0EA5B353A7}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{AA4551D2-0CCE-4B94-9ECB-0E0EA5B353A7}.Release|Any CPU.Build.0 = Release|Any CPU
-		{AA4551D2-0CCE-4B94-9ECB-0E0EA5B353A7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{AA4551D2-0CCE-4B94-9ECB-0E0EA5B353A7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 	EndGlobalSection
 EndGlobal
