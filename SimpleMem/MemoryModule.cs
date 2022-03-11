@@ -1,6 +1,5 @@
 ﻿using System.Buffers;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
@@ -73,14 +72,16 @@ public class MemoryModule : Memory
 	}
 
 	/// <summary>
-	/// Array of Byte pattern scan. Allows scanning for an exact array of bytes with wildcard support.
-	/// Note: Partial wildcards are not supported and will be converted into full wildcards. This has a
-	/// small possibility of resulting in more matches than desired. (e.g. AB ?1 turns into AB ??)
+	///  Array of Byte pattern scan. Allows scanning for an exact array of bytes with wildcard support.
+	///  Note: Partial wildcards are not supported and will be converted into full wildcards. This has a
+	///  small possibility of resulting in more matches than desired. (e.g. AB ?1 turns into AB ??)
 	/// </summary>
-	/// <param name="pattern">The pattern of bytes to look for. Bytes are separated by spaces.
-	/// Wildcards (?? symbols) are supported.</param>
+	/// <param name="pattern">
+	///  The pattern of bytes to look for. Bytes are separated by spaces.
+	///  Wildcards (?? symbols) are supported.
+	/// </param>
 	/// <example>
-	/// <code>
+	///  <code>
 	///  var addresses = AoBScan("03 AD FF ?? ?? ?? 4D");
 	///  // Returns a list of addresses found (if any) matching the pattern.
 	/// </code>
@@ -180,9 +181,8 @@ public class MemoryModule : Memory
 		}
 	}
 
-	// TODO: Update documentation
 	/// <summary>
-	///  Finds the address from a chain of pointers repeatedly applied to lpBaseAddress.
+	///  Resolves the address from a MultiLevelPtr.
 	///  <returns>
 	///   The memory address that results from the end of the pointer chain.
 	///   Call ReadMemory on this address to retrieve the value located
@@ -225,7 +225,7 @@ public class MemoryModule : Memory
 	}
 
 	/// <summary>
-	/// Resolves the value from the address found from mlPtr
+	///  Resolves the value from the address found from mlPtr
 	/// </summary>
 	/// <param name="mlPtr">The MultiLevelPtr to read from</param>
 	/// <typeparam name="T">The type of data to read from the address resolved from the MultiLevelPtr.</typeparam>
