@@ -101,7 +101,7 @@ public class MemoryModule : Memory
 		Int64 procMinAddressL = (long)procMinAddress;
 		Int64 procMaxAddressL = (long)procMaxAddress;
 
-		Int32[] intBytes = transformBytes(pattern);
+		int[] intBytes = transformBytes(pattern);
 
 		var ret = new List<IntPtr>();
 		while (procMinAddressL < procMaxAddressL)
@@ -109,24 +109,34 @@ public class MemoryModule : Memory
 			// 48 = sizeof(MEMORY_BASIC_INFORMATION)
 			VirtualQueryEx(ProcessHandle, procMinAddress, out var memBasicInfo, 48);
 
+			int CHUNK_SZ;
+			if (memBasicInfo.RegionSize > int.MaxValue)
+			{
+				CHUNK_SZ = int.MaxValue / 2;
+			}
+			else
+			{
+				CHUNK_SZ = Math.Min(int.MaxValue / 2, (int)memBasicInfo.RegionSize);
+			}
+
 			// Check to see if chunk is accessible
 			if (memBasicInfo.Protect == PAGE_READWRITE && memBasicInfo.State == MEM_COMMIT)
 			{
 				var shared = ArrayPool<byte>.Shared;
-				byte[] buffer = shared.Rent((int)memBasicInfo.RegionSize);
+				byte[] buffer = shared.Rent(CHUNK_SZ);
 
 				unsafe
 				{
 					fixed (byte* bp = buffer)
 					{
 						ReadProcessMemory(ProcessHandle, new IntPtr((long)memBasicInfo.BaseAddress), bp,
-							(int)memBasicInfo.RegionSize, out int _);
+							CHUNK_SZ, out int _);
 					}
 				}
 
 				var results = new List<IntPtr>();
 
-				for (int i = 0; i < (int)memBasicInfo.RegionSize; i++)
+				for (long i = 0; i < CHUNK_SZ; i++)
 				{
 					for (int j = 0; j < intBytes.Length; j++)
 					{
@@ -147,7 +157,7 @@ public class MemoryModule : Memory
 				shared.Return(buffer);
 			}
 
-			procMinAddressL += (long)memBasicInfo.RegionSize;
+			procMinAddressL += CHUNK_SZ;
 			procMinAddress = new IntPtr(procMinAddressL);
 		}
 

@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace SimpleMem;
 
@@ -125,6 +126,10 @@ public class Memory
 		byte* lpBuffer, int dwSize, out int lpBytesRead);
 
 	[DllImport("kernel32.dll")]
+	protected static extern unsafe bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress,
+		char* lpBuffer, int dwSize, out int lpBytesRead);
+
+	[DllImport("kernel32.dll")]
 	protected static extern unsafe bool WriteProcessMemory(IntPtr hProcess,
 		IntPtr lpBaseAddress, [Out] byte* lpBuffer, int dwSize, out int lpNumberOfBytesWritten);
 
@@ -151,7 +156,6 @@ public class Memory
 		}
 	}
 
-#region WriteMemory
 	/// <summary>
 	///  Overwrites the value at lpBaseAddress with the provided value.
 	/// </summary>
@@ -172,9 +176,50 @@ public class Memory
 			}
 		}
 	}
-#endregion
 
-#region ReadMemory
+	/// <summary>
+	///  Writes a string to the given address. If the length of value is longer than
+	///  the maximum length of the string supported by the process at lpBaseAddress,
+	///  the contents of value will overflow into subsequent addresses and will be
+	///  truncated by <see cref="ReadString" />.
+	/// </summary>
+	/// <example>
+	///  <code>
+	///  IntPtr addr = new IntPtr(0xabcd);
+	///  var mem = new Memory("MyGame");
+	///  mem.WriteString(addr, "abc"); // Overwrites value at addr with "abc\0".
+	///  mem.WriteString(addr, "abc", false); // Overwrites first 3 chars at addr with "abc". Other characters are left untouched.
+	///  </code>
+	/// </example>
+	/// <param name="lpBaseAddress">The address in memory to write to</param>
+	/// <param name="value">The string to write</param>
+	/// <param name="isNullTerminated">
+	///  Whether the written string should be null terminated.
+	///  If false, the value written will overwrite chars beginning from lpBaseAddress through
+	///  the end of value. See the example for more info.
+	/// </param>
+	/// <param name="encoding">The encoding to write the string in. UTF-8 by default.</param>
+	/// <returns>Number of bytes written</returns>
+	public int WriteMemory(IntPtr lpBaseAddress, string value, bool isNullTerminated = true, Encoding? encoding = null)
+	{
+		encoding ??= Encoding.UTF8;
+
+		if (isNullTerminated)
+		{
+			value += "\0";
+		}
+
+		Span<byte> buffer = encoding.GetBytes(value);
+		unsafe
+		{
+			fixed (byte* bp = buffer)
+			{
+				WriteProcessMemory(ProcessHandle, lpBaseAddress, bp, buffer.Length, out int bytesWritten);
+				return bytesWritten;
+			}
+		}
+	}
+
 	/// <summary>
 	///  Reads memory of the desired type from lpBaseAddress.
 	/// </summary>
@@ -244,7 +289,30 @@ public class Memory
 		}
 		// BUG: the memory needs to be paged and looped through if sizeBytes is too large as RPM has a size limit.
 	}
-#endregion
+
+	/// <summary>
+	///  Reads the specified number of bytes from lpBaseAddress in the specified encoding.
+	///  The string is expected to start at the provided address. The user is not expected to know
+	///  the length of the string obtained.
+	/// </summary>
+	/// <param name="lpBaseAddress">The address to read from</param>
+	/// <param name="size">The maximum size of the string in bytes</param>
+	/// <param name="encoding">The encoding to process the read string through. UTF-8 by default.</param>
+	/// <returns>The first string read from lpBaseAddress, in UTF-8 encoding unless otherwise specified.</returns>
+	/// <exception cref="InvalidOperationException">A string could not be read from the address.</exception>
+	public string ReadString(IntPtr lpBaseAddress, int size = 255, Encoding? encoding = null)
+	{
+		encoding ??= Encoding.UTF8;
+
+		ReadOnlySpan<byte> buffer = stackalloc byte[size];
+		if (ReadMemory(lpBaseAddress, buffer) > 0)
+		{
+			string s = encoding.GetString(buffer).Split('\0')[0];
+			return s;
+		}
+
+		throw new InvalidOperationException("Failed to read string.");
+	}
 
 #region Supplemental Methods
 	/// <summary>
