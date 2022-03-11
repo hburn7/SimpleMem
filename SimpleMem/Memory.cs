@@ -86,7 +86,7 @@ public class Memory
 	///  for writing is AccessLevel.WRITE | AccessLevel.OPERATION.
 	///  AccessLevel.ALL_ACCESS gives full read-write access to the process.
 	/// </param>
-	protected Memory(string processName, AccessLevel accessLevel = AccessLevel.ALL_ACCESS)
+	public Memory(string processName, AccessLevel accessLevel = AccessLevel.ALL_ACCESS)
 	{
 		Process = GetProcess(processName);
 		ProcessAccessLevel = accessLevel;
@@ -122,7 +122,6 @@ public class Memory
 
 	[DllImport("kernel32.dll")]
 	protected static extern unsafe bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress,
-		[Out]
 		byte* lpBuffer, int dwSize, out int lpBytesRead);
 
 	[DllImport("kernel32.dll")]
