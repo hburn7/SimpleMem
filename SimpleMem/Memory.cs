@@ -1,37 +1,45 @@
-﻿using System.Diagnostics;
+﻿using System.Buffers;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
+// ReSharper disable UnusedMember.Local
 
 namespace SimpleMem;
 
-public struct MEMORY_BASIC_INFORMATION
+//
+#pragma warning disable CS0649
+internal struct MEMORY_BASIC_INFORMATION
 {
-	public ulong BaseAddress;
-	public ulong AllocationBase;
-	public uint AllocationProtect;
-	public uint __alignment1;
-	public ulong RegionSize;
-	public uint State;
-	public uint Protect;
-	public uint Type;
-	public uint __alignment2;
+	internal ulong BaseAddress;
+	internal ulong AllocationBase;
+	internal uint AllocationProtect;
+	internal uint __alignment1;
+	internal ulong RegionSize;
+	internal uint State;
+	internal uint Protect;
+	internal uint Type;
+	internal uint __alignment2;
 }
 
-public struct SYSTEM_INFO
+internal struct SYSTEM_INFO
 {
-	public ushort processorArchitecture;
-	private ushort reserved;
-	public uint pageSize;
-	public IntPtr minimumApplicationAddress;
-	public IntPtr maximumApplicationAddress;
-	public IntPtr activeProcessorMask;
-	public uint numberOfProcessors;
-	public uint processorType;
-	public uint allocationGranularity;
-	public ushort processorLevel;
-	public ushort processorRevision;
+	internal ushort processorArchitecture;
+	internal ushort reserved;
+	internal uint pageSize;
+	internal IntPtr minimumApplicationAddress;
+	internal IntPtr maximumApplicationAddress;
+	internal IntPtr activeProcessorMask;
+	internal uint numberOfProcessors;
+	internal uint processorType;
+	internal uint allocationGranularity;
+	internal ushort processorLevel;
+	internal ushort processorRevision;
 }
+#pragma warning restore CS0649
 
 /// <summary>
 ///  Access level to open a process with
@@ -68,8 +76,10 @@ public class Memory
 {
 	private const int PROCESS_QUERY_INFORMATION = 0x0400;
 	private const int PROCESS_WM_READ = 0x0010;
-	protected const int MEM_COMMIT = 0x00001000;
-	protected const int PAGE_READWRITE = 0x04;
+	private const int MEM_COMMIT = 0x00001000;
+	private const int PAGE_READWRITE = 0x04;
+
+	private readonly string _moduleName;
 
 	/// <summary>
 	///  Opens a handle to the given processName at the provided moduleName.
@@ -81,17 +91,31 @@ public class Memory
 	///  The name of the process. Use <see cref="GetProcessList" />
 	///  and find your process name if unsure. That value can be passed in as this parameter.
 	/// </param>
+	/// <param name="moduleName">The name of the module to use as the base pointer. This defaults to your
+	/// application's executable if left null.</param>
 	/// <param name="accessLevel">
 	///  The desired access level.
 	///  The minimum required for reading is AccessLevel.READ and the minimum required
 	///  for writing is AccessLevel.WRITE | AccessLevel.OPERATION.
 	///  AccessLevel.ALL_ACCESS gives full read-write access to the process.
 	/// </param>
-	public Memory(string processName, AccessLevel accessLevel = AccessLevel.ALL_ACCESS)
+	public Memory(string processName, string? moduleName = null, AccessLevel accessLevel = AccessLevel.ALL_ACCESS)
 	{
 		Process = GetProcess(processName);
 		ProcessAccessLevel = accessLevel;
 		ProcessHandle = OpenProcess((int)ProcessAccessLevel, false, Process.Id);
+		
+		_moduleName = moduleName ?? Process.MainModule?.ModuleName ?? "<module not found>";
+		if (moduleName == null)
+		{
+			Module = Process.MainModule ?? throw new InvalidOperationException("Process has no main module.");
+		}
+		else
+		{
+			Module = GetModule(Process);
+		}
+
+		ModuleBaseAddress = Module.BaseAddress;
 	}
 
 	/// <summary>
@@ -110,29 +134,51 @@ public class Memory
 	///  The size of pointers for this process.
 	/// </summary>
 	public int PtrSize { get; } = IntPtr.Size;
+	/// <summary>
+	///  Module assosciated with the provided moduleName, or the process's MainModule by default.
+	/// </summary>
+	public ProcessModule Module { get; }
+	/// <summary>
+	///  Base address of the module
+	/// </summary>
+	public IntPtr ModuleBaseAddress { get; }
 
 	[DllImport("kernel32.dll")]
 	private static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
 
 	[DllImport("kernel32.dll")]
-	protected static extern void GetSystemInfo(out SYSTEM_INFO lpSystemInfo);
+	private static extern void GetSystemInfo(out SYSTEM_INFO lpSystemInfo);
 
 	[DllImport("kernel32.dll", SetLastError = true)]
-	protected static extern int VirtualQueryEx(IntPtr hProcess,
+	private static extern int VirtualQueryEx(IntPtr hProcess,
 		IntPtr lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, uint dwLength);
 
 	[DllImport("kernel32.dll")]
-	protected static extern unsafe bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress,
+	private static extern unsafe bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress,
 		byte* lpBuffer, int dwSize, out int lpBytesRead);
 
 	[DllImport("kernel32.dll")]
-	protected static extern unsafe bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress,
+	private static extern unsafe bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress,
 		char* lpBuffer, int dwSize, out int lpBytesRead);
 
 	[DllImport("kernel32.dll")]
-	protected static extern unsafe bool WriteProcessMemory(IntPtr hProcess,
+	private static extern unsafe bool WriteProcessMemory(IntPtr hProcess,
 		IntPtr lpBaseAddress, [Out] byte* lpBuffer, int dwSize, out int lpNumberOfBytesWritten);
 
+	private ProcessModule GetModule(Process proc)
+	{
+		var module = proc.Modules
+		                 .Cast<ProcessModule>()
+		                 .SingleOrDefault(module => string.Equals(module.ModuleName, _moduleName, StringComparison.OrdinalIgnoreCase));
+
+		if (module == null)
+		{
+			throw new InvalidOperationException($"Could not retrieve the module {_moduleName}.");
+		}
+
+		return module;
+	}
+	
 	/// <summary>
 	///  Gets the process (if possible) based on the class's processName.
 	/// </summary>
@@ -297,22 +343,220 @@ public class Memory
 	/// </summary>
 	/// <param name="lpBaseAddress">The address to read from</param>
 	/// <param name="size">The maximum size of the string in bytes</param>
+	/// <param name="isNullTerminated">Whether or not to return the first null-terminated string found.
+	/// If false, returns a string containing the first (size) bytes beginning from lpBaseAddress.
+	/// For example, if false and size is 255, returns a string with 255 bytes of character data
+	/// beginning from lpBaseAddress.</param>
 	/// <param name="encoding">The encoding to process the read string through. UTF-8 by default.</param>
-	/// <returns>The first string read from lpBaseAddress, in UTF-8 encoding unless otherwise specified.</returns>
+	/// <returns>The first string read from lpBaseAddress in UTF-8 encoding, unless otherwise specified.</returns>
 	/// <exception cref="InvalidOperationException">A string could not be read from the address.</exception>
-	public string ReadString(IntPtr lpBaseAddress, int size = 255, Encoding? encoding = null)
+	public string ReadString(IntPtr lpBaseAddress, int size = 255, bool isNullTerminated = true, Encoding? encoding = null)
 	{
 		encoding ??= Encoding.UTF8;
 
 		ReadOnlySpan<byte> buffer = stackalloc byte[size];
 		if (ReadMemory(lpBaseAddress, buffer) > 0)
 		{
-			string s = encoding.GetString(buffer).Split('\0')[0];
-			return s;
+			return isNullTerminated ? encoding.GetString(buffer).Split('\0')[0] : encoding.GetString(buffer)[..size];
 		}
 
 		throw new InvalidOperationException("Failed to read string.");
 	}
+	
+	/// <summary>
+	///  Array of Byte pattern scan. Allows scanning for an exact array of bytes with wildcard support.
+	///  Note: Partial wildcards are not supported and will be converted into full wildcards. This has a
+	///  small possibility of resulting in more matches than desired. (e.g. AB ?1 turns into AB ??)
+	/// </summary>
+	/// <param name="pattern">
+	///  The pattern of bytes to look for. Bytes are separated by spaces.
+	///  Wildcards (?? symbols) are supported.
+	/// </param>
+	/// <example>
+	///  <code>
+	///  var addresses = AoBScan("03 AD FF ?? ?? ?? 4D");
+	///  // Returns a list of addresses found (if any) matching the pattern.
+	/// </code>
+	/// </example>
+	/// <returns></returns>
+	[SuppressMessage("ReSharper", "AccessToModifiedClosure")]
+	public List<IntPtr> AoBScan(string pattern)
+	{
+		// Ensure capitalization
+		pattern = pattern.ToUpper();
+		// Get min & max addresses
+
+		GetSystemInfo(out var sysInfo);
+
+		var procMinAddress = sysInfo.minimumApplicationAddress;
+		var procMaxAddress = sysInfo.maximumApplicationAddress;
+
+		Int64 procMinAddressL = (long)procMinAddress;
+		Int64 procMaxAddressL = (long)procMaxAddress;
+
+		int[] intBytes = transformBytes(pattern);
+
+		var ret = new List<IntPtr>();
+		while (procMinAddressL < procMaxAddressL)
+		{
+			// 48 = sizeof(MEMORY_BASIC_INFORMATION)
+			VirtualQueryEx(ProcessHandle, procMinAddress, out var memBasicInfo, 48);
+
+			int CHUNK_SZ;
+			if (memBasicInfo.RegionSize > int.MaxValue)
+			{
+				CHUNK_SZ = int.MaxValue / 2;
+			}
+			else
+			{
+				CHUNK_SZ = Math.Min(int.MaxValue / 2, (int)memBasicInfo.RegionSize);
+			}
+
+			// Check to see if chunk is accessible
+			if (memBasicInfo.Protect == PAGE_READWRITE && memBasicInfo.State == MEM_COMMIT)
+			{
+				var shared = ArrayPool<byte>.Shared;
+				byte[] buffer = shared.Rent(CHUNK_SZ);
+
+				unsafe
+				{
+					fixed (byte* bp = buffer)
+					{
+						ReadProcessMemory(ProcessHandle, new IntPtr((long)memBasicInfo.BaseAddress), bp,
+							CHUNK_SZ, out int _);
+					}
+				}
+
+				var results = new List<IntPtr>();
+
+				for (long i = 0; i < CHUNK_SZ; i++)
+				{
+					for (int j = 0; j < intBytes.Length; j++)
+					{
+						if (intBytes[j] != -1 && intBytes[j] != buffer[i + j])
+						{
+							break;
+						}
+
+						if ((j + 1) == intBytes.Length)
+						{
+							var result = new IntPtr(i + (long)memBasicInfo.BaseAddress);
+							results.Add(result);
+						}
+					}
+				}
+
+				ret.AddRange(results);
+				shared.Return(buffer);
+			}
+
+			procMinAddressL += CHUNK_SZ;
+			procMinAddress = new IntPtr(procMinAddressL);
+		}
+
+		return ret;
+
+		// Helper method
+		Int32[] transformBytes(string signature)
+		{
+			string[] bytes = signature.Split(' ');
+			Int32[] ints = new int[bytes.Length];
+
+			var regexes = new Regex[]
+			{
+				new(@"\?[0-9]"),
+				new(@"[0-9]\?")
+			};
+
+			for (int i = 0; i < ints.Length; i++)
+			{
+				if (bytes[i] == "??" || regexes.Any(x => x.IsMatch(bytes[i])))
+				{
+					ints[i] = -1;
+				}
+				else
+				{
+					ints[i] = Int32.Parse(bytes[i], NumberStyles.HexNumber);
+				}
+			}
+
+			return ints;
+		}
+	}
+	
+	/// <summary>
+	///  Resolves the address from a MultiLevelPtr.
+	///  <returns>
+	///   The memory address that results from the end of the pointer 
+	///   Call ReadMemory on this address to retrieve the value located
+	///   at this address.
+	///  </returns>
+	///  <example>
+	///   <code>
+	/// var mem = new MemoryModule("MyApplication");
+	/// // Assuming the resulting value at this offset is an Int32.
+	/// int[] myItemOffsets = { 0xABCD, 0xA, 0xB, 0xC };
+	/// int myItemAddress = mem.GetAddressFromMlPtr(new MultiLevelPtr(mem.ModuleBaseAddress, myItemOffsets));
+	/// var value = mem.ReadMemory&lt;int&gt;(myItemAddress);
+	/// </code>
+	///  </example>
+	/// </summary>
+	public IntPtr ReadAddressFromMlPtr(MultiLevelPtr mlPtr)
+	{
+		if (!mlPtr.Offsets.Any())
+		{
+			return mlPtr.Base;
+		}
+
+		// Read whatever value is located at the baseAddress. This is our new address.
+		long res = (long)mlPtr.Base;
+		foreach (var offset in mlPtr.Offsets)
+		{
+			var nextAddress = new IntPtr(res + (long)offset);
+			if (offset == mlPtr.Offsets.ElementAt(mlPtr.Offsets.Count - 1))
+			{
+				// Return address of item we're longerested in.
+				// Returning a ReadMemory here would result in the value of the item.
+				return nextAddress;
+			}
+
+			// Keep looking for address
+			res = ReadMemory<int>(new IntPtr(res + (long)offset));
+		}
+
+		return new IntPtr(res);
+	}
+
+	/// <summary>
+	///  Resolves the value from the address found from mlPtr
+	/// </summary>
+	/// <param name="mlPtr">The MultiLevelPtr to read from</param>
+	/// <typeparam name="T">The type of data to read from the address resolved from the MultiLevelPtr.</typeparam>
+	/// <returns>Value found from the resolved MultiLevelPtr</returns>
+	public T ReadValueFromMlPtr<T>(MultiLevelPtr mlPtr) where T : struct => ReadMemory<T>(ReadAddressFromMlPtr(mlPtr));
+
+	/// <summary>
+	///  Resolves the value from the address found from mlPtr
+	/// </summary>
+	/// <param name="mlPtr">The MultiLevelPtr to read from</param>
+	/// <typeparam name="T">The type associated with the given MultiLevelPtr.</typeparam>
+	/// <returns>Value found from the resolved MultiLevelPtr</returns>
+	public T ReadValueFromMlPtr<T>(MultiLevelPtr<T> mlPtr) where T : struct => ReadMemory<T>(ReadAddressFromMlPtr(mlPtr));
+
+	/// <summary>
+	/// Reads a string from the address found from mlPtr.
+	/// <inheritdoc cref="ReadString"/>
+	/// </summary>
+	/// <param name="mlPtr">The MultiLevelPtr to read from</param>
+	/// <param name="size">The maximum size of the string in bytes</param>
+	/// <param name="isNullTerminated">Whether or not to return the first null-terminated string found.
+	/// If false, returns a string containing the first (size) bytes beginning from lpBaseAddress.
+	/// For example, if false and size is 255, returns a string with 255 bytes of character data
+	/// beginning from lpBaseAddress.</param>
+	/// <param name="encoding">The encoding to process the read string through. UTF-8 by default.</param>
+	/// <returns>The first string read from lpBaseAddress in UTF-8 encoding, unless otherwise specified.</returns>
+	public string ReadStringFromMlPtr(MultiLevelPtr mlPtr, int size = 255, bool isNullTerminated = true,
+		Encoding? encoding = null) => ReadString(ReadAddressFromMlPtr(mlPtr), size, isNullTerminated, encoding);
 
 #region Supplemental Methods
 	/// <summary>
