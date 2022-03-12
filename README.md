@@ -97,15 +97,15 @@ public class Main
 
     public Main()
     {
-        // If your module is different than "MyGame.exe", specify
-        _mem = new MemoryModule("MyGame");
+        // If your module is different than "MyGame.exe", specify.
+        _mem = new Memory("MyGame");
     }
 
     // Reads value from the address resulting from the pointer chain
     void ReadValueFromPointerChain()
     {
-        var mlPtr = new MultiLevelPtr(_mem.ModuleBaseAddress, PlayerHealthOffsets);
-        int desiredValue = _mem.GetValFromMlPtr<int>(mlPtr);
+        var mlPtr = new MultiLevelPtr<int>(_mem.ModuleBaseAddress, PlayerHealthOffsets);
+        int desiredValue = _mem.ReadValFromMlPtr<int>(mlPtr);
         // etc...
     }
 
@@ -117,7 +117,7 @@ public class Main
         int newValue = 500;
         
         var mlPtr = new MultiLevelPtr(_mem.ModuleBaseAddress, PlayerHealthOffsets);
-        int address = _mem.GetAddressFromMlPtr(mlPtr);
+        int address = _mem.ReadAddressFromMlPtr(mlPtr);
         
         _mem.WriteMemory(address, newValue);
     }
