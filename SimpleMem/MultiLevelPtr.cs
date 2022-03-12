@@ -20,6 +20,7 @@
 public class MultiLevelPtr
 {
 	/// <summary>
+	/// <inheritdoc cref="MultiLevelPtr"/>
 	/// </summary>
 	/// <param name="lpBaseAddress">The address the pointer starts from. This is almost always the ModuleBaseAddress.</param>
 	/// <param name="offsets">The offsets needed to decipher the chain</param>
@@ -54,6 +55,7 @@ public class MultiLevelPtr
 	}
 
 	/// <summary>
+	/// <inheritdoc cref="MultiLevelPtr"/>
 	/// Creates a multi level pointer from an existing one, then adds
 	/// the provided offsets to the old baseMlPtr's offsets list.
 	/// </summary>
@@ -83,6 +85,7 @@ public class MultiLevelPtr
 	}
 
 	/// <summary>
+	/// <inheritdoc cref="MultiLevelPtr" />
 	/// Creates a multi level pointer from an existing one, then adds
 	/// the provided offsets to the old baseMlPtr's offsets list.
 	/// </summary>
@@ -191,9 +194,21 @@ public class MultiLevelPtr
 }
 
 /// <summary>
-/// <inheritdoc cref="MultiLevelPtr"/>
-/// Generic overload for <see cref="MultiLevelPtr"/>. Useful to store the expected type resolved from the
-/// end of the pointer chain (the type resolved from ReadMemory&lt;T&gt;).
+///  Class for conveniently definining multi-level pointers.
+///  Multi-level pointers are used for obtaining values even
+///  after restarts of programs (unlike a single,
+///  non-static memory address).
+///  <example>
+///   Consider a game called "MyGame" with a module of "MyGame.exe".
+///   "MyGame.exe" is given a memory address that changes with each
+///   launch of the program, but all of the values desired (such as
+///   gold, points, exp, etc.) lay the same distance away in memory
+///   from the module. Say the offset for gold is 0xC and exp is 0xD.
+///   A MultiLevelPtr can be created from the "base address" of the module
+///   with the offsets being 0xC for gold and 0xD for exp. Assuming the
+///   base address and offsets are correct, the desired values will
+///   always be returned.
+///  </example>
 /// </summary>
 /// <typeparam name="T">The expected type resolved from the MultiLevelPtr</typeparam>
 public class MultiLevelPtr<T> : MultiLevelPtr where T : struct
