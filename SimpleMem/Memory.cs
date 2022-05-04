@@ -518,7 +518,19 @@ public class Memory
 		var baseRead = new IntPtr((long)ModuleBaseAddress + (long)mlPtr.Base);
 
 		// Read whatever value is located at the baseAddress. This is our new address.
-		int res = ReadMemory<int>(baseRead);
+		long res;
+		bool readLong;
+		
+		if ((long)baseRead > int.MaxValue)
+		{
+			res = ReadMemory<long>(baseRead);
+			readLong = true;
+		}
+		else
+		{
+			res = ReadMemory<int>(baseRead);
+			readLong = false;
+		}
 
 		if (!mlPtr.Offsets.Any())
 		{
@@ -536,7 +548,14 @@ public class Memory
 			}
 
 			// Keep looking for address
-			res = ReadMemory<int>(nextAddress);
+			if (readLong)
+			{
+				res = ReadMemory<long>(nextAddress);
+			}
+			else
+			{
+				res = ReadMemory<int>(nextAddress);
+			}
 		}
 
 		return new IntPtr(res);
