@@ -232,6 +232,24 @@ public class Memory
 	}
 
 	/// <summary>
+	/// Writes the given byte array directly to memory at lpBaseAddress
+	/// </summary>
+	/// <param name="lpBaseAddress">The address to overwrite data at</param>
+	/// <param name="bytes">The bytes to write</param>
+	/// <returns>Number of bytes written</returns>
+	public int WriteMemory(IntPtr lpBaseAddress, params byte[] bytes)
+	{
+		unsafe
+		{
+			fixed (byte* bp = bytes)
+			{
+				WriteProcessMemory(ProcessHandle, lpBaseAddress, bp, bytes.Length, out int bytesWritten);
+				return bytesWritten;
+			}
+		}
+	}
+
+	/// <summary>
 	///  Writes a string to the given address. If the length of value is longer than
 	///  the maximum length of the string supported by the process at lpBaseAddress,
 	///  the contents of value will overflow into subsequent addresses and will be
