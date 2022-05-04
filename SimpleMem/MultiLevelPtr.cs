@@ -20,7 +20,7 @@
 public class MultiLevelPtr
 {
 	/// <summary>
-	/// <inheritdoc cref="MultiLevelPtr"/>
+	///  <inheritdoc cref="MultiLevelPtr" />
 	/// </summary>
 	/// <param name="lpBaseAddress">The address the pointer starts from. This is almost always the ModuleBaseAddress.</param>
 	/// <param name="offsets">The offsets needed to decipher the chain</param>
@@ -55,9 +55,9 @@ public class MultiLevelPtr
 	}
 
 	/// <summary>
-	/// <inheritdoc cref="MultiLevelPtr"/>
-	/// Creates a multi level pointer from an existing one, then adds
-	/// the provided offsets to the old baseMlPtr's offsets list.
+	///  <inheritdoc cref="MultiLevelPtr" />
+	///  Creates a multi level pointer from an existing one, then adds
+	///  the provided offsets to the old baseMlPtr's offsets list.
 	/// </summary>
 	/// <param name="baseMlPtr">The previous MultiLevelPtr to base this one from</param>
 	/// <param name="offsets">Collection of offsets to append to the old base offsets</param>
@@ -72,7 +72,7 @@ public class MultiLevelPtr
 				Offsets.Add(offset);
 			}
 		}
-		
+
 		if (!offsets.Any())
 		{
 			return;
@@ -85,9 +85,9 @@ public class MultiLevelPtr
 	}
 
 	/// <summary>
-	/// <inheritdoc cref="MultiLevelPtr" />
-	/// Creates a multi level pointer from an existing one, then adds
-	/// the provided offsets to the old baseMlPtr's offsets list.
+	///  <inheritdoc cref="MultiLevelPtr" />
+	///  Creates a multi level pointer from an existing one, then adds
+	///  the provided offsets to the old baseMlPtr's offsets list.
 	/// </summary>
 	/// <param name="baseMlPtr">The previous MultiLevelPtr to base this one from</param>
 	/// <param name="offsets">Collection of offsets to append to the old base offsets</param>
@@ -102,7 +102,7 @@ public class MultiLevelPtr
 				Offsets.Add(offset);
 			}
 		}
-		
+
 		if (!offsets.Any())
 		{
 			return;
@@ -169,7 +169,7 @@ public class MultiLevelPtr
 	///  Optional list of offsets containing pointer offsets (from the provided base).
 	/// </summary>
 	public IList<IntPtr> Offsets { get; set; } = new List<IntPtr>();
-	
+
 	private static IList<IntPtr> ConvertInts(int[] ints)
 	{
 		var n = new List<IntPtr>(ints.Length);
@@ -215,18 +215,25 @@ public class MultiLevelPtr<T> : MultiLevelPtr where T : struct
 {
 	/// <inheritdoc />
 	public MultiLevelPtr(IntPtr lpBaseAddress, params IntPtr[] offsets) : base(lpBaseAddress, offsets) {}
+
 	/// <inheritdoc />
 	public MultiLevelPtr(IntPtr lpBaseAddress, params int[] offsets) : base(lpBaseAddress, offsets) {}
+
 	/// <inheritdoc />
 	public MultiLevelPtr(MultiLevelPtr baseMlPtr, params int[] offsets) : base(baseMlPtr, offsets) {}
+
 	/// <inheritdoc />
 	public MultiLevelPtr(MultiLevelPtr baseMlPtr, params long[] offsets) : base(baseMlPtr, offsets) {}
+
 	/// <inheritdoc />
 	public MultiLevelPtr(long lpBaseAddress, params int[] offsets) : base(lpBaseAddress, offsets) {}
+
 	/// <inheritdoc />
 	public MultiLevelPtr(IntPtr[] pointers) : base(pointers) {}
+
 	/// <inheritdoc />
 	public MultiLevelPtr(int[] pointers) : base(pointers) {}
+
 	/// <inheritdoc />
 	public MultiLevelPtr(long[] pointers) : base(pointers) {}
 }
