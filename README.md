@@ -27,7 +27,7 @@ Memory.PrintProcessList();
 ```
 
 Find the name of the base module, if not known. This is typically the name of the process name and its extension, such
-as `MyApplication.exe`. This can also be a `.dll` *.dll support is untested as of v1.1.0*.
+as `MyApplication.exe`. This can also be a `.dll` module, if present in the `Process.Modules` list. Unity games do not work with SimpleMem due to `mono.dll` being external to the process.
 
 ## Reading and Writing Memory
 
