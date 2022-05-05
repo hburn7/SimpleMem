@@ -1,4 +1,5 @@
-﻿using System.Buffers;
+﻿using System;
+using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
@@ -42,46 +43,75 @@ internal struct SYSTEM_INFO
 #pragma warning restore CS0649
 
 /// <summary>
-///  Access level to open a process with
-/// </summary>
-[Flags]
-public enum AccessLevel
-{
-	/// <summary>
-	///  Required to read memory in a process
-	/// </summary>
-	READ = 0x0010,
-	/// <summary>
-	///  Required to write to memory in a process
-	/// </summary>
-	WRITE = 0x0020,
-	/// <summary>
-	///  Required to perform an operation on the address space of a process.
-	/// </summary>
-	OPERATION = 0x0008,
-	/// <summary>
-	///  Required to retrieve certain information about a process, such as its token, exit code, and priority class
-	/// </summary>
-	QUERY_INFORMATION = 0x0400,
-	/// <summary>
-	///  All possible access rights for a process (that are necessary to read/write memory)
-	/// </summary>
-	ALL_ACCESS = READ | WRITE | OPERATION | QUERY_INFORMATION
-}
-
-/// <summary>
 ///  Class for cross-architecture memory manipulation.
 /// </summary>
 public class Memory
 {
-	private const int PROCESS_QUERY_INFORMATION = 0x0400;
-	private const int PROCESS_WM_READ = 0x0010;
-	private const int MEM_COMMIT = 0x00001000;
-	private const int PAGE_EXECUTE_READWRITE = 0x40;
-	private const int PAGE_EXECUTE_READ = 0x20;
-	private const int PAGE_READ_WRITE = 0x04;
-	private const int PAGE_READONLY = 0x02;
 	private readonly string _moduleName;
+
+#pragma warning disable CS1591
+	/// <summary>
+	///  Access level to open a process with
+	/// </summary>
+	public struct ACCESS_LEVEL
+	{
+		public const long DELETE = 0x00010000L;
+		public const long READ_CONTROL = 0x00020000L;
+		public const long WRITE_DAC = 0x00040000L;
+		public const long WRITE_OWNER = 0x00080000L;
+		
+		public const int PROCESS_CREATE_PROCESS = 0x0080;
+		public const int PROCESS_CREATE_THREAD = 0x0002;
+		public const int PROCESS_DUP_HANDLE = 0x0040;
+		public const int PROCESS_QUERY_INFORMATION = 0x0400;
+		public const int PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+		public const int PROCESS_SET_INFORMATION = 0x0200;
+		public const int PROCESS_SET_QUOTA = 0x0100;
+		public const int PROCESS_SUSPEND_RESUME = 0x0800;
+		public const int PROCESS_TERMINATE = 0x0001;
+		public const int PROCESS_VM_OPERATION = 0x0008;
+		public const int PROCESS_VM_READ = 0x0010;
+		public const int PROCESS_VM_WRITE = 0x0020;
+
+		public const long STANDARD_RIGHTS_REQUIRED = 0x000F0000L;
+		public const long SYNCHRONIZE = 0x00100000L;
+
+		public const long PROCESS_ALL_ACCESS = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF;
+	}
+
+	public struct MEM_ALLOC
+	{
+		public const int MEM_COMMIT = 0x00001000;
+		public const int MEM_RESERVE = 0x00002000;
+		public const int MEM_RESET = 0x00080000;
+		public const int MEM_RESET_UNDO = 0x1000000;
+		public const int MEM_LARGE_PAGES = 0x20000000;
+		public const int MEM_PHYSICAL = 0x00400000;
+		public const int MEM_TOP_DOWN = 0x00100000;
+
+		public const int MEM_COMMIT_RESERVE = MEM_COMMIT | MEM_RESERVE;
+	}
+
+	public struct MEM_PROTECT
+	{
+		public const int PAGE_EXECUTE = 0x10;
+		public const int PAGE_EXECUTE_READ = 0x20;
+		public const int PAGE_EXECUTE_READWRITE = 0x40;
+		public const int PAGE_EXECUTE_WRITECOPY = 0x80;
+		public const int PAGE_NO_ACCESS = 0x01;
+		public const int PAGE_READONLY = 0x02;
+		public const int PAGE_READWRITE = 0x04;
+		public const int PAGE_WRITECOPY = 0x08;
+		public const int PAGE_TARGETS_INVALID = 0x40000000;
+		public const int PAGE_TARGETS_NO_UPDATGE = 0x40000000;
+		
+		// Can only be used in special cases, see MSDN
+		// https://docs.microsoft.com/en-us/windows/win32/memory/memory-protection-constants
+		public const int PAGE_GUARD = 0x100;
+		public const int PAGE_NOCACHE = 0x200;
+		public const int PAGE_WRITECOMBINE = 0x400;
+	}
+#pragma warning restore CS1591
 
 	/// <summary>
 	///  Opens a handle to the given processName at the provided moduleName.
@@ -103,7 +133,7 @@ public class Memory
 	///  for writing is AccessLevel.WRITE | AccessLevel.OPERATION.
 	///  AccessLevel.ALL_ACCESS gives full read-write access to the process.
 	/// </param>
-	public Memory(string processName, string? moduleName = null, AccessLevel accessLevel = AccessLevel.ALL_ACCESS)
+	public Memory(string processName, string? moduleName = null, long accessLevel = ACCESS_LEVEL.PROCESS_ALL_ACCESS)
 	{
 		Process = GetProcess(processName);
 		ProcessAccessLevel = accessLevel;
@@ -125,7 +155,7 @@ public class Memory
 	/// <summary>
 	///  The user-defined desired access level for which the process was opened under.
 	/// </summary>
-	public AccessLevel ProcessAccessLevel { get; }
+	public long ProcessAccessLevel { get; }
 	/// <summary>
 	///  The current process
 	/// </summary>
@@ -151,27 +181,108 @@ public class Memory
 	/// </summary>
 	public string ModuleBaseAddressHex => ModuleBaseAddress.ToString("X");
 
-	[DllImport("kernel32.dll")]
+#pragma warning disable CS1591
+	[DllImport("kernel32.dll", SetLastError = true)]
 	private static extern IntPtr OpenProcess(int dwDesiredAccess, bool bInheritHandle, int dwProcessId);
 
-	[DllImport("kernel32.dll")]
+	[DllImport("kernel32.dll", SetLastError = true)]
 	private static extern void GetSystemInfo(out SYSTEM_INFO lpSystemInfo);
+	
+	[DllImport("kernel32.dll", SetLastError = true)]
+	private static extern int VirtualAllocEx(IntPtr hProcess,
+		IntPtr lpAddress, int dwSize, int flAllocationType, int flProtect);
 
 	[DllImport("kernel32.dll", SetLastError = true)]
 	private static extern int VirtualQueryEx(IntPtr hProcess,
 		IntPtr lpAddress, out MEMORY_BASIC_INFORMATION lpBuffer, uint dwLength);
 
-	[DllImport("kernel32.dll")]
+	[DllImport("kernel32.dll", SetLastError = true)]
+	private static extern int VirtualProtectEx(IntPtr hProcess,
+		IntPtr lpAddress, int dwSize, int fLNewProtect, out int lpflOldProtect);
+	
+	[DllImport("kernel32.dll", SetLastError = true)]
 	private static extern unsafe bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress,
 		byte* lpBuffer, int dwSize, out int lpBytesRead);
 
-	[DllImport("kernel32.dll")]
-	private static extern unsafe bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress,
-		char* lpBuffer, int dwSize, out int lpBytesRead);
-
-	[DllImport("kernel32.dll")]
+	[DllImport("kernel32.dll", SetLastError = true)]
 	private static extern unsafe bool WriteProcessMemory(IntPtr hProcess,
 		IntPtr lpBaseAddress, [Out] byte* lpBuffer, int dwSize, out int lpNumberOfBytesWritten);
+	
+	[DllImport("kernel32.dll")]
+	public static extern UInt32 GetLastError();
+	
+	/// <summary>
+	/// Wrapper for kernel32.dll WriteProcessMemory. Calls VirtualProtectEx() on memory to
+	/// allow writing to protected memory.
+	/// </summary>
+	/// <param name="hProcess"></param>
+	/// <param name="lpBaseAddress"></param>
+	/// <param name="lpBuffer"></param>
+	/// <param name="dwSize"></param>
+	/// <returns>Number of bytes read</returns>
+	/// <exception cref="MemoryWriteException">Thrown if the memory failed to be written</exception>
+	private unsafe int WriteProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, [Out] byte* lpBuffer, int dwSize)
+	{
+		int code = VirtualProtectEx(hProcess, lpBaseAddress, dwSize,
+			MEM_PROTECT.PAGE_EXECUTE_READWRITE, out int lpflOldProtect);
+
+		if (code == 0)
+		{
+			throw new MemoryWriteException(GetLastError());
+		}
+		
+		if (lpflOldProtect == 0)
+		{
+			throw new MemoryWriteException(GetLastError());
+		}
+
+		WriteProcessMemory(hProcess, lpBaseAddress, lpBuffer, dwSize, out int lpNumberOfBytesWritten);
+		
+		VirtualProtectEx(hProcess, lpBaseAddress, dwSize, lpflOldProtect, out int _);
+		
+		if (lpNumberOfBytesWritten == 0)
+		{
+			throw new MemoryWriteException(GetLastError());
+		}
+
+		return lpNumberOfBytesWritten;
+	}
+
+	/// <summary>
+	/// Wrapper for kernel32.dll ReadProcessMemory
+	/// </summary>
+	/// <param name="hProcess"></param>
+	/// <param name="lpBaseAddress"></param>
+	/// <param name="lpBuffer"></param>
+	/// <param name="dwSize"></param>
+	/// <returns>Number of bytes read</returns>
+	private unsafe int ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, byte* lpBuffer, int dwSize)
+	{
+		int code = VirtualProtectEx(hProcess, lpBaseAddress, dwSize,
+			MEM_PROTECT.PAGE_EXECUTE_READ, out int lpflOldProtect);
+
+		if (code == 0)
+		{
+			throw new MemoryReadException(GetLastError());
+		}
+		
+		if (lpflOldProtect == (int)IntPtr.Zero)
+		{
+			throw new MemoryReadException(GetLastError());
+		}
+		
+		ReadProcessMemory(hProcess, lpBaseAddress, lpBuffer, dwSize, out int lpNumberOfBytesRead);
+		VirtualProtectEx(hProcess, lpBaseAddress, dwSize, lpflOldProtect, out int _);
+		
+		if (lpNumberOfBytesRead == 0)
+		{
+			throw new MemoryReadException(GetLastError());
+		}
+
+		return lpNumberOfBytesRead;
+	}
+	
+#pragma warning restore CS1591
 
 	private ProcessModule GetModule(Process proc)
 	{
@@ -225,8 +336,10 @@ public class Memory
 		{
 			fixed (byte* bp = buffer)
 			{
-				WriteProcessMemory(ProcessHandle, lpBaseAddress, bp, buffer.Length, out int bytesWritten);
-				return bytesWritten;
+				VirtualAllocEx(ProcessHandle, lpBaseAddress, buffer.Length, MEM_ALLOC.MEM_COMMIT_RESERVE,
+					MEM_PROTECT.PAGE_EXECUTE_READWRITE);
+				
+				return WriteProcessMemory(ProcessHandle, lpBaseAddress, bp, buffer.Length);
 			}
 		}
 	}
@@ -243,8 +356,7 @@ public class Memory
 		{
 			fixed (byte* bp = bytes)
 			{
-				WriteProcessMemory(ProcessHandle, lpBaseAddress, bp, bytes.Length, out int bytesWritten);
-				return bytesWritten;
+				return WriteProcessMemory(ProcessHandle, lpBaseAddress, bp, bytes.Length);
 			}
 		}
 	}
@@ -286,8 +398,7 @@ public class Memory
 		{
 			fixed (byte* bp = buffer)
 			{
-				WriteProcessMemory(ProcessHandle, lpBaseAddress, bp, buffer.Length, out int bytesWritten);
-				return bytesWritten;
+				return WriteProcessMemory(ProcessHandle, lpBaseAddress, bp, buffer.Length);
 			}
 		}
 	}
@@ -306,7 +417,7 @@ public class Memory
 		{
 			fixed (byte* bp = buffer)
 			{
-				ReadProcessMemory(ProcessHandle, lpBaseAddress, bp, buffer.Length, out int _);
+				ReadProcessMemory(ProcessHandle, lpBaseAddress, bp, buffer.Length);
 			}
 		}
 
@@ -333,8 +444,7 @@ public class Memory
 		{
 			fixed (byte* bp = buffer)
 			{
-				ReadProcessMemory(ProcessHandle, lpBaseAddress, bp, buffer.Length, out int bytesRead);
-				return bytesRead;
+				return ReadProcessMemory(ProcessHandle, lpBaseAddress, bp, buffer.Length);
 			}
 		}
 		// BUG: the memory needs to be paged and looped through if sizeBytes is too large as RPM has a size limit.
@@ -355,8 +465,7 @@ public class Memory
 		{
 			fixed (byte* bp = buffer.Span)
 			{
-				ReadProcessMemory(ProcessHandle, lpBaseAddress, bp, buffer.Length, out int bytesRead);
-				return bytesRead;
+				return ReadProcessMemory(ProcessHandle, lpBaseAddress, bp, buffer.Length);
 			}
 		}
 		// BUG: the memory needs to be paged and looped through if sizeBytes is too large as RPM has a size limit.
@@ -388,7 +497,7 @@ public class Memory
 			return isNullTerminated ? encoding.GetString(buffer).Split('\0')[0] : encoding.GetString(buffer)[..size];
 		}
 
-		throw new InvalidOperationException("Failed to read string.");
+		throw new InvalidOperationException("String could not be read.");
 	}
 
 	/// <summary>
@@ -441,9 +550,8 @@ public class Memory
 			}
 
 			// Check to see if chunk is accessible
-			if (memBasicInfo.Protect is PAGE_EXECUTE_READWRITE or PAGE_EXECUTE_READ
-				    or PAGE_READONLY or PAGE_READ_WRITE &&
-			    memBasicInfo.State == MEM_COMMIT)
+			if (memBasicInfo.Protect is MEM_PROTECT.PAGE_EXECUTE_READWRITE or MEM_PROTECT.PAGE_EXECUTE_READ
+				    or MEM_PROTECT.PAGE_READONLY or MEM_PROTECT.PAGE_READWRITE && memBasicInfo.State == MEM_ALLOC.MEM_COMMIT)
 			{
 				var shared = ArrayPool<byte>.Shared;
 				byte[] buffer = shared.Rent(CHUNK_SZ);
@@ -459,16 +567,21 @@ public class Memory
 
 				var results = new List<IntPtr>();
 
-				for (long i = 0; i < CHUNK_SZ; i++)
+				for (long i = 0; i < buffer.Length; i++)
 				{
 					for (int j = 0; j < intBytes.Length; j++)
 					{
+						if ((i + j) >= buffer.Length)
+						{
+							break;
+						}
+						
 						if (intBytes[j] != -1 && intBytes[j] != buffer[i + j])
 						{
 							break;
 						}
 
-						if ((j + 1) == intBytes.Length)
+						if (j == (intBytes.Length - 1))
 						{
 							var result = new IntPtr(i + (long)memBasicInfo.BaseAddress);
 							results.Add(result);
