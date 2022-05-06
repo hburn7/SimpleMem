@@ -1,4 +1,6 @@
-﻿namespace SimpleMem;
+﻿using System.Text;
+
+namespace SimpleMem;
 
 /// <summary>
 ///  Class for conveniently definining multi-level pointers.
@@ -170,6 +172,20 @@ public class MultiLevelPtr
 	/// </summary>
 	public IList<IntPtr> Offsets { get; set; } = new List<IntPtr>();
 
+	/// <inheritdoc />
+	public override string ToString()
+	{
+		var sb = new StringBuilder($"MultiLevelPtr(Base={Base:X}, Offsets=[");
+		foreach (var offset in Offsets)
+		{
+			sb.Append($"{offset:X}, ");
+		}
+
+		sb.Remove(sb.Length - 2, 2);
+		sb.Append("])");
+		return sb.ToString();
+	}
+
 	private static IList<IntPtr> ConvertInts(int[] ints)
 	{
 		var n = new List<IntPtr>(ints.Length);
@@ -236,4 +252,24 @@ public class MultiLevelPtr<T> : MultiLevelPtr where T : struct
 
 	/// <inheritdoc />
 	public MultiLevelPtr(long[] pointers) : base(pointers) {}
+}
+
+public static class PointerExtensions
+{
+	/// <summary>
+	///  Gets the value, in memory, of this <see cref="MultiLevelPtr{T}" />. This extension saves
+	///  a separate call to <see cref="Memory.ReadAddressFromMlPtr" />.
+	/// </summary>
+	/// <param name="mlPtr">The <see cref="MultiLevelPtr{T}" /> to read the value from</param>
+	/// <param name="mem">The <see cref="Memory" /> instance in which this value lays</param>
+	/// <returns></returns>
+	public static T Value<T>(this MultiLevelPtr<T> mlPtr, Memory mem) where T : struct => mem.ReadValueFromMlPtr(mlPtr);
+
+	/// <summary>
+	///  The address resolved from the given mlPtr.
+	/// </summary>
+	/// <param name="mlPtr">The <see cref="MultiLevelPtr" /> to read the address from</param>
+	/// <param name="mem">The <see cref="Memory" /> instance in which this address lays</param>
+	/// <returns>A IntPtr containing the address, if found.</returns>
+	public static IntPtr Address(this MultiLevelPtr mlPtr, Memory mem) => mem.ReadAddressFromMlPtr(mlPtr);
 }
