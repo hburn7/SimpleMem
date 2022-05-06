@@ -27,7 +27,8 @@ Memory.PrintProcessList();
 ```
 
 Find the name of the base module, if not known. This is typically the name of the process name and its extension, such
-as `MyApplication.exe`. This can also be a `.dll` module, if present in the `Process.Modules` list. Unity games do not work with SimpleMem due to `mono.dll` being external to the process.
+as `MyApplication.exe`. This can also be a `.dll` module, if present in the `Process.Modules` list. Unity games do not
+work with SimpleMem due to `mono.dll` being external to the process.
 
 ## Reading and Writing Memory
 
@@ -41,10 +42,14 @@ Create a new `Memory` object.
 
 ```cs
 var mem = new Memory("MyGame"); // Your process name here
+
+// Or, specify a module too. This module must exist within
+// the process's "Modules" property (a ProcessModuleCollection object).
+// See https://docs.microsoft.com/en-us/dotnet/api/system.diagnostics.processmodulecollection?view=net-6.0
+var mem = new Memory("MyGame", "mydll.dll");
 ```
 
-To read the value located at a memory address, create a pointer to the address and call `ReadMemory...` on it
-(`...` changes depending on the desired return type).
+To read the value located at a pointer in memory, create a pointer to the address and call `ReadMemory()` or `ReadMemory<T>()`.
 
 ```cs
 const int ADDRESS = 0xABCD123; // Your address here
@@ -72,23 +77,25 @@ It's that easy!
 SimpleMem provides full support for reading addresses and values from base addresses and offsets.
 
 First, find the module name - this can easily be found via [Cheat Engine](https://cheatengine.org/). This is almost
-always a `.exe` or `.dll` and is known as the `ModuleBaseAddress`. By default, it is your application's executable.
+always a `.exe` or `.dll` - make sure this is specified upon construction of `Memory`.
 
 To identify pointer chains, Cheat Engine's pointer scanner feature can be used. More info can be
 found [here](https://cheatengine.org/help/pointer-scan.htm). For this example, our desired value will rest
-at `MyGame.exe+0x74DF02 -> 0x04 -> 0x28` where `->` represents a pointer from one address to the next. The value read at
-the end of the pointer chain (`...0x28`) contains our desired value.
+at `"MyGame.exe"+0x74DF02 -> 0x04 -> 0x28` where `->` represents a pointer from one address to the next,
+as seen in Cheat Engine. The value read at the end of the pointer chain (`...0x28`) contains our desired value.
 
 __Pointer chain example__
 
 ```cs
 static class Offsets
 {
-    // For this example, "PlayerBase" refers to some arbitrary player in a video game.
+    // For this example, "PlayerBase" refers to some arbitrary "player" data structure base address.
     public const int PlayerBase = 0x74DF02;
 
-    // Offsets to locate desired value
-    public static int[] PlayerHealthOffsets = new int[] { PlayerBase, 0x04, 0x28 };
+    // Offsets to locate desired value - "health" which is a float (in this example).
+    // PlayerBase and 0x4 are both pointers in memory. 
+    // 0xC is the offset at which our health float lays from the previous pointer.
+    public static readonly MultiLevelPtr<float> PlayerHealth = new MultiLevelPtr<int>(PlayerBase, 0x4, 0xC);
 }
 
 public class Main
@@ -97,37 +104,33 @@ public class Main
 
     public Main()
     {
-        // If your module is different than "MyGame.exe", specify.
+        // Don't specify .exe here
         _mem = new Memory("MyGame");
     }
 
-    // Reads value from the address resulting from the pointer chain
     void ReadValueFromPointerChain()
     {
-        var mlPtr = new MultiLevelPtr<int>(_mem.ModuleBaseAddress, PlayerHealthOffsets);
-        int desiredValue = _mem.ReadValFromMlPtr<int>(mlPtr);
-        // etc...
+        // Traditional read
+        int desiredValue = _mem.ReadValueFromMlPtr<int>(Offsets.PlayerHealth);
+        
+        // Using extensions
+        int desiredValue = Offsets.PlayerHealth.Value(_mem);
+        
+        // Work with the value below...
     }
 
-    // Writes value to the address resulting from the pointer chain
     void WriteValueToPointerChain()
     {
         // Assumes address at the end of the pointer chain is int.
         // This should be known by the programmer already.
         int newValue = 500;
         
-        var mlPtr = new MultiLevelPtr(_mem.ModuleBaseAddress, PlayerHealthOffsets);
-        int address = _mem.ReadAddressFromMlPtr(mlPtr);
-        
+        // Traditional write
+        int address = _mem.ReadAddressFromMlPtr(Offsets.PlayerHealth);
         _mem.WriteMemory(address, newValue);
+        
+        // Using extensions
+        Offsets.PlayerHealth.WriteValue(_mem, newValue);
     }
 }
 ```
-
-## Remarks
-
-- The library does not handle any errors arising from:
-    - Inability to find the process
-    - Inability to read memory from the given address or offsets
-    - Bad memory writes (writing to wrong address, writing bad values, etc.)
-- Strings are not currently supported
