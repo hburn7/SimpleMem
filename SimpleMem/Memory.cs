@@ -173,10 +173,10 @@ public class Memory
 		}
 	}
 
-	/// <inheritdoc cref="WriteMemory{T}"/>
+	/// <inheritdoc cref="WriteMemory{T}" />
 	public int WriteMemory(IntPtr lpBaseAddress, params byte[] bytes) => WriteMemory(lpBaseAddress, bytes, false);
-	
-	/// <inheritdoc cref="WriteMemory{T}"/>
+
+	/// <inheritdoc cref="WriteMemory{T}" />
 	/// This overload can possibly resolve some memory access violation errors at a significant speed cost.
 	/// Use sparingly.
 	public int WriteMemoryProtected(IntPtr lpBaseAddress, params byte[] bytes) => WriteMemory(lpBaseAddress, bytes, true);
@@ -186,8 +186,10 @@ public class Memory
 	/// </summary>
 	/// <param name="lpBaseAddress">The address to overwrite data at</param>
 	/// <param name="bytes">The bytes to write</param>
-	/// <param name="isProtected">Whether the memory access is processed by a VirtualProtectEx call.
-	/// This can resolve some memory access violation errors at a significant speed cost - use sparingly.</param>
+	/// <param name="isProtected">
+	///  Whether the memory access is processed by a VirtualProtectEx call.
+	///  This can resolve some memory access violation errors at a significant speed cost - use sparingly.
+	/// </param>
 	/// <returns>Number of bytes written</returns>
 	private int WriteMemory(IntPtr lpBaseAddress, byte[] bytes, bool isProtected = false)
 	{
@@ -246,8 +248,10 @@ public class Memory
 	///  Reads memory of the desired type from lpBaseAddress.
 	/// </summary>
 	/// <param name="lpBaseAddress">The address to read from</param>
-	/// <param name="isProtected">Whether the memory access is processed by a VirtualProtectEx call.
-	/// This can resolve some memory access violation errors at a significant speed cost - use sparingly.</param>
+	/// <param name="isProtected">
+	///  Whether the memory access is processed by a VirtualProtectEx call.
+	///  This can resolve some memory access violation errors at a significant speed cost - use sparingly.
+	/// </param>
 	/// <typeparam name="T">The type of data to read</typeparam>
 	/// <returns>The value read from lpBaseAddress</returns>
 	/// <exception cref="InvalidOperationException">Type specified could not be read</exception>
@@ -276,8 +280,10 @@ public class Memory
 	/// </summary>
 	/// <param name="lpBaseAddress">The address to read from</param>
 	/// <param name="buffer">The buffer to fill with read data</param>
-	/// <param name="isProtected">Whether the memory access is processed by a VirtualProtectEx call.
-	/// This can resolve some memory access violation errors at a significant speed cost - use sparingly.</param>
+	/// <param name="isProtected">
+	///  Whether the memory access is processed by a VirtualProtectEx call.
+	///  This can resolve some memory access violation errors at a significant speed cost - use sparingly.
+	/// </param>
 	/// <returns>
 	///  Number of bytes read
 	/// </returns>
@@ -299,8 +305,10 @@ public class Memory
 	/// </summary>
 	/// <param name="lpBaseAddress">The address to read from</param>
 	/// <param name="buffer">The buffer to fill with read data</param>
-	/// <param name="isProtected">Whether the memory access is processed by a VirtualProtectEx call.
-	/// This can resolve some memory access violation errors at a significant speed cost - use sparingly.</param>
+	/// <param name="isProtected">
+	///  Whether the memory access is processed by a VirtualProtectEx call.
+	///  This can resolve some memory access violation errors at a significant speed cost - use sparingly.
+	/// </param>
 	/// <returns>
 	///  Number of bytes read
 	/// </returns>
