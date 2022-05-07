@@ -17,6 +17,7 @@ public static class ErrorCodes
 		{ 13, "The data is invalid" },
 		{ 14, "Not enough memory is available to complete this operation" },
 		{ 87, "Invalid parameter" },
+		{ 299, "Only part of a ReadProcessMemory or WriteProcessMemory request was completed" },
 		{ 487, "Attempt to access invalid address" },
 		{ 998, "Invalid access to memory location" }
 	};
